@@ -1,4 +1,3 @@
-# Dump.CS-to-Lua-Table
 This Script will change all the Dump.cs file into new file.lua contain a lua table
 
 Remove void function since they act on themself or on the class and no return values
