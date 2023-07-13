@@ -1,11 +1,12 @@
 PC = false
-
 if not gg then
     PC = true
 else
     PC = false
 end
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- // File Input
 if not PC then
     File = gg.prompt(
         {
@@ -14,6 +15,7 @@ if not PC then
         {gg.EXT_STORAGE .. "/Download/"},
         {"file"}
     )
+
     if File ~= nil and File ~= gg.EXT_STORAGE .. "/Download/" then
         File = assert(io.open(File[1], "r"))
     end
@@ -22,14 +24,18 @@ else
 end
 
 local str = File:read("*a")
+
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- // Dumping Functions
 function Dumper(str)
+    -- // Trash Clean
     local trash = {}
 
     for _ in str:gmatch("Image %d+: (%a+)") do
         trash[#trash + 1] = _
     end
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
     function TrashClean(any)
         for _, __ in pairs(trash) do
             local boomer = any:find(__)
@@ -39,7 +45,8 @@ function Dumper(str)
         end
         return false
     end
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    -- //  Garbage Clear
     local function garbageClear(tab)
         if type(tab) == "table" then
             for k, v in pairs(tab) do
@@ -47,6 +54,7 @@ function Dumper(str)
                     if not v or v == "" or #v == 0 then
                         k = nil
                     end
+
                     if type(v) == "table" then
                         garbageClear(v)
                     end
@@ -54,7 +62,8 @@ function Dumper(str)
             end
         end
     end
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    -- // Fortify Garbage Collection
     function FortifyGC(tab)
         local temp = tab
         for k, v in pairs(temp) do
@@ -65,21 +74,26 @@ function Dumper(str)
                             p = nil
                         end
                     end
+
                     if not val or #val == 0 or val == "" then
                         index = nil
                     end
                 end
+
                 if not value or #value == 0 or value == "" then
                     key = nil
                 end
             end
+
             if not v or #v == 0 or v == "" then
                 k = nil
             end
         end
+
         return temp
     end
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    -- // Dumper Table
     DumperTable = {
         Update = function(self, ...)
             local name, class, FM, data = ...
@@ -101,18 +115,21 @@ function Dumper(str)
             end
         end
     }
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    -- // Get Namespace, Class, Fields, and Methods
     for namespace, classname, body in str:gmatch("Namespace: (%g+)\n%.*public class (%a+) .-// TypeDefIndex:.-\n{(.-)\n}") do
         if not namespace then
             namespace = "System"
         end
+
         if not TrashClean(namespace) then
             namespace = namespace:gsub("[.]", "")
             local bug = string.find(body, "public const string %a+ =%g+")
             if bug ~= nil then
                 body = ""
             end
-            --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+            -- // Get Fields
             for fbody in body:gmatch("// Fields\n(.-)%// [%bMethods*%bProperties*]+.\n") do
                 for field_dtype, Mode, field_name, field_offset in fbody:gmatch(".-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%a+) (%g+); // (0x%x+)") do
                     if field_offset ~= "0x0" and (Mode == "int" or Mode == "bool" or Mode == "double" or Mode == "float") then
@@ -133,7 +150,8 @@ function Dumper(str)
                     end
                 end
             end
-            --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+            -- // Get Methods
             for meth in body:gmatch("// Methods(.+)") do
                 for offset, _, data_type, method_name in meth:gmatch("RVA:.-Offset: (0x%x+).-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%.*%a+) (.-) %{ %}\n") do
                     if data_type == "int" or data_type == "bool" or data_type == "double" or data_type == "float" then
@@ -159,9 +177,14 @@ function Dumper(str)
     garbageClear(DumperTable)
     return DumperTable
 end
+
+-- // Run Dumper function
 Dumper(str)
 DumperTable = FortifyGC(DumperTable)
+
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- // Dump Table into a Lua File
 function Dump(ResTab)
     local cache, stack, output = {}, {}, {}
     local depth = 1
@@ -171,7 +194,7 @@ function Dump(ResTab)
         for k, v in pairs(ResTab) do
             size = size + 1
         end
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
         local cur_index = 1
         for k, v in pairs(ResTab) do
             if (cache[ResTab] == nil) or (cur_index >= cache[ResTab]) then
@@ -182,14 +205,14 @@ function Dump(ResTab)
                 end
                 table.insert(output, output_str)
                 output_str = ""
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
                 local key
                 if (type(k) == "number" or type(k) == "boolean") then
                     key = "[" .. tostring(k) .. "]"
                 else
                     key = "['" .. tostring(k) .. "']"
                 end
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
                 if (type(v) == "number" or type(v) == "boolean") then
                     output_str = output_str .. string.rep("\t", depth) .. key .. " = " .. tostring(v)
                 elseif (type(v) == "table") then
@@ -215,11 +238,11 @@ function Dump(ResTab)
 
             cur_index = cur_index + 1
         end
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
         if (size == 0) then
             output_str = output_str .. "\n" .. string.rep("\t", depth - 1) .. "}"
         end
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
         if (#stack > 0) then
             ResTab = stack[#stack]
             stack[#stack] = nil
@@ -234,6 +257,8 @@ function Dump(ResTab)
     return output_str
 end
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- // Output Dumped Table to a Lua File
 Res = io.output("DumpTable.lua")
 Res:write(
     "\n--[[\nNameSpace  ->>\n ClassName  ->>\n  (•)Fields \n\t ► Info \n\t ►  Name \n\t ►  Offset\n  (•)Methods \n\t ► Info \n\t ►  name \n\t ►  Type \n\t ►  Offset\n]]\n\n" ..
@@ -241,7 +266,10 @@ Res:write(
 )
 Res:close()
 File:close()
+
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- // Message
 if not PC then
     gg.alert("◄\tSuccess\t►\n\n\n File Name : DumpTable.lua\n\n Dir same as the script path!")
 else
