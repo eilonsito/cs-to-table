@@ -6,7 +6,6 @@ else
 end
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
--- // File Input
 if not PC then
     File = gg.prompt(
         {
@@ -27,9 +26,7 @@ local str = File:read("*a")
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
--- // Dumping Functions
 function Dumper(str)
-    -- // Trash Clean
     local trash = {}
 
     for _ in str:gmatch("Image %d+: (%a+)") do
@@ -46,7 +43,6 @@ function Dumper(str)
         return false
     end
 
-    -- //  Garbage Clear
     local function garbageClear(tab)
         if type(tab) == "table" then
             for k, v in pairs(tab) do
@@ -63,7 +59,6 @@ function Dumper(str)
         end
     end
 
-    -- // Fortify Garbage Collection
     function FortifyGC(tab)
         local temp = tab
         for k, v in pairs(temp) do
@@ -93,7 +88,6 @@ function Dumper(str)
         return temp
     end
 
-    -- // Dumper Table
     DumperTable = {
         Update = function(self, ...)
             local name, class, FM, data = ...
@@ -116,12 +110,11 @@ function Dumper(str)
         end
     }
 
-    -- // Get Namespace, Class, Fields, and Methods
+    
     for namespace, classname, body in str:gmatch("Namespace: (%g+)\n%.*public class (%a+) .-// TypeDefIndex:.-\n{(.-)\n}") do
         if not namespace then
             namespace = "System"
         end
-
         if not TrashClean(namespace) then
             namespace = namespace:gsub("[.]", "")
             local bug = string.find(body, "public const string %a+ =%g+")
@@ -129,7 +122,6 @@ function Dumper(str)
                 body = ""
             end
 
-            -- // Get Fields
             for fbody in body:gmatch("// Fields\n(.-)%// [%bMethods*%bProperties*]+.\n") do
                 for field_dtype, Mode, field_name, field_offset in fbody:gmatch(".-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%a+) (%g+); // (0x%x+)") do
                     if field_offset ~= "0x0" and (Mode == "int" or Mode == "bool" or Mode == "double" or Mode == "float") then
@@ -150,8 +142,6 @@ function Dumper(str)
                     end
                 end
             end
-
-            -- // Get Methods
             for meth in body:gmatch("// Methods(.+)") do
                 for offset, _, data_type, method_name in meth:gmatch("RVA:.-Offset: (0x%x+).-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%.*%a+) (.-) %{ %}\n") do
                     if data_type == "int" or data_type == "bool" or data_type == "double" or data_type == "float" then
@@ -172,19 +162,16 @@ function Dumper(str)
             end
         end
     end
-
     DumperTable.Update = nil
     garbageClear(DumperTable)
     return DumperTable
 end
 
--- // Run Dumper function
 Dumper(str)
 DumperTable = FortifyGC(DumperTable)
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
--- // Dump Table into a Lua File
 function Dump(ResTab)
     local cache, stack, output = {}, {}, {}
     local depth = 1
@@ -258,7 +245,6 @@ function Dump(ResTab)
 end
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
--- // Output Dumped Table to a Lua File
 Res = io.output("DumpTable.lua")
 Res:write(
     "\n--[[\nNameSpace  ->>\n ClassName  ->>\n  (•)Fields \n\t ► Info \n\t ►  Name \n\t ►  Offset\n  (•)Methods \n\t ► Info \n\t ►  name \n\t ►  Type \n\t ►  Offset\n]]\n\n" ..
@@ -269,7 +255,6 @@ File:close()
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
--- // Message
 if not PC then
     gg.alert("◄\tSuccess\t►\n\n\n File Name : DumpTable.lua\n\n Dir same as the script path!")
 else
