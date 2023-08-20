@@ -121,7 +121,6 @@ function Dumper(str)
             if bug ~= nil then
                 body = ""
             end
-
             for fbody in body:gmatch("// Fields\n(.-)%// [%bMethods*%bProperties*]+.\n") do
                 for field_dtype, Mode, field_name, field_offset in fbody:gmatch(".-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%a+) (%g+); // (0x%x+)") do
                     if field_offset ~= "0x0" and (Mode == "int" or Mode == "bool" or Mode == "double" or Mode == "float") then
@@ -193,6 +192,7 @@ function Dump(ResTab)
                 table.insert(output, output_str)
                 output_str = ""
 
+                
                 local key
                 if (type(k) == "number" or type(k) == "boolean") then
                     key = "[" .. tostring(k) .. "]"
