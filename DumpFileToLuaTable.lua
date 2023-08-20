@@ -28,7 +28,6 @@ local str = File:read("*a")
 
 function Dumper(str)
     local trash = {}
-
     for _ in str:gmatch("Image %d+: (%a+)") do
         trash[#trash + 1] = _
     end
