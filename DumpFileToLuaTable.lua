@@ -106,8 +106,7 @@ local function Dumper(Content)
                             Info = FieldType
                         }
                         DumperTable:Update(Namespace, Classname, "Fields", FieldData)
-
-                        -- Feedback for the user depending on the platform --
+                        
                         if not IsPc then
                             gg.toast("Please wait...", true)
                         else
