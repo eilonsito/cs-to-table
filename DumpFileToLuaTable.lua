@@ -1,261 +1,229 @@
-PC = false
-if not gg then
-    PC = true
-else
-    PC = false
-end
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+local IsPc = not gg
 
-if not PC then
-    File = gg.prompt(
-        {
-            "◄\tScript By Elon Musk\t►\nSelect Dump.cs File"
-        },
-        {gg.EXT_STORAGE .. "/Download/"},
-        {"file"}
+-- File Handling --
+local FilePath
+
+if not IsPc then
+    FilePath = gg.prompt(
+        { "◄\tScript By Elon Musk\t►\nSelect Dump.cs File" },
+        { gg.EXT_STORAGE .. "/Download/" },
+        { "file" }
     )
 
-    if File ~= nil and File ~= gg.EXT_STORAGE .. "/Download/" then
-        File = assert(io.open(File[1], "r"))
+    if FilePath and FilePath[1] ~= gg.EXT_STORAGE .. "/Download/" then
+        File = assert(io.open(FilePath[1], "r"))
     end
 else
+    -- If on PC, default is dump.cs --
     File = assert(io.open("dump.cs", "r"))
 end
 
-local str = File:read("*a")
+local FileContent = File:read("*a")
 
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-function Dumper(str)
-    local trash = {}
-    for _ in str:gmatch("Image %d+: (%a+)") do
-        trash[#trash + 1] = _
+-- Function to Parse and clean the file --
+local function Dumper(Content)
+    local TrashPatterns = {}
+
+    -- Get unwanted patterns --
+    for Match in Content:gmatch("Image %d+: (%a+)") do
+        table.insert(TrashPatterns, Match)
     end
 
-    function TrashClean(any)
-        for _, __ in pairs(trash) do
-            local boomer = any:find(__)
-            if boomer ~= nil then
+    -- Check if the string is trash --
+    local function IsTrash(Value)
+        for _, Pattern in ipairs(TrashPatterns) do
+            if Value:find(Pattern) then
                 return true
             end
         end
         return false
     end
 
-    local function garbageClear(tab)
-        if type(tab) == "table" then
-            for k, v in pairs(tab) do
-                if type(v) == "table" then
-                    if not v or v == "" or #v == 0 then
-                        k = nil
-                    end
-
-                    if type(v) == "table" then
-                        garbageClear(v)
-                    end
+    -- Clean up the table --
+    local function CleanTable(Tab)
+        for Key, Value in pairs(Tab) do
+            if type(Value) == "table" then
+                CleanTable(Value)
+                if next(Value) == nil then
+                    Tab[Key] = nil
                 end
+            elseif not Value or Value == "" then
+                Tab[Key] = nil
             end
         end
     end
 
-    function FortifyGC(tab)
-        local temp = tab
-        for k, v in pairs(temp) do
-            for key, value in pairs(temp[k]) do
-                for index, val in pairs(temp[k][key]) do
-                    for p, o in pairs(temp[k][key][index]) do
-                        if not o or #o == 0 or o == "" then
-                            p = nil
-                        end
-                    end
-
-                    if not val or #val == 0 or val == "" then
-                        index = nil
-                    end
+    -- Remove empty entries --
+    local function OptimizeTable(Tab)
+        for Key, Value in pairs(Tab) do
+            if type(Value) == "table" then
+                OptimizeTable(Value)
+                if next(Value) == nil then
+                    Tab[Key] = nil
                 end
-
-                if not value or #value == 0 or value == "" then
-                    key = nil
-                end
-            end
-
-            if not v or #v == 0 or v == "" then
-                k = nil
+            elseif not Value or Value == "" then
+                Tab[Key] = nil
             end
         end
-
-        return temp
+        return Tab
     end
 
-    DumperTable = {
-        Update = function(self, ...)
-            local name, class, FM, data = ...
-            if not self[name] then
-                self[name] = {}
-            else
-                if not self[name][class] then
-                    self[name][class] = {}
-                else
-                    if data ~= nil and not self[name][class][FM] then
-                        self[name][class][FM] = {}
-                    else
-                        if data ~= nil then
-                            self[name][class][FM][#self[name][class][FM] + 1] = data
-                            garbageClear(DumperTable)
-                        end
-                    end
-                end
-            end
-        end
-    }
+    -- Main table to store the parsed data --
+    local DumperTable = {}
 
-    
-    for namespace, classname, body in str:gmatch("Namespace: (%g+)\n%.*public class (%a+) .-// TypeDefIndex:.-\n{(.-)\n}") do
-        if not namespace then
-            namespace = "System"
+    -- Update with new data --
+    function DumperTable:Update(Name, Class, FieldMethod, Data)
+        self[Name] = self[Name] or {}
+        self[Name][Class] = self[Name][Class] or {}
+        if Data then
+            self[Name][Class][FieldMethod] = self[Name][Class][FieldMethod] or {}
+            table.insert(self[Name][Class][FieldMethod], Data)
+            CleanTable(DumperTable)
         end
-        if not TrashClean(namespace) then
-            namespace = namespace:gsub("[.]", "")
-            local bug = string.find(body, "public const string %a+ =%g+")
-            if bug ~= nil then
-                body = ""
+    end
+
+    -- Parse to extract fields and methods --
+    for Namespace, Classname, Body in Content:gmatch("Namespace: (%g+)\n%.*public class (%a+) .-// TypeDefIndex:.-\n{(.-)\n}") do
+        Namespace = Namespace or "System"
+
+        if not IsTrash(Namespace) then
+            Namespace = Namespace:gsub("%.", "")
+
+            -- Skip any body with public const string patterns --
+            if Body:find("public const string %a+ =%g+") then
+                Body = ""
             end
-            for fbody in body:gmatch("// Fields\n(.-)%// [%bMethods*%bProperties*]+.\n") do
-                for field_dtype, Mode, field_name, field_offset in fbody:gmatch(".-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%a+) (%g+); // (0x%x+)") do
-                    if field_offset ~= "0x0" and (Mode == "int" or Mode == "bool" or Mode == "double" or Mode == "float") then
-                        local temp = {
-                            name = tostring(field_name),
-                            type = tostring(Mode),
-                            Offset = field_offset,
-                            info = tostring(field_dtype)
+
+            -- Extract and store fields --
+            for FieldBody in Body:gmatch("// Fields\n(.-)%// [%bMethods*%bProperties*]+.\n") do
+                for FieldType, Mode, FieldName, FieldOffset in FieldBody:gmatch(".-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%a+) (%g+); // (0x%x+)") do
+                    if FieldOffset ~= "0x0" and (Mode == "int" or Mode == "bool" or Mode == "double" or Mode == "float") then
+                        local FieldData = {
+                            Name = FieldName,
+                            Type = Mode,
+                            Offset = FieldOffset,
+                            Info = FieldType
                         }
-                        if field_dtype ~= nil and Mode ~= nil and field_name ~= nil and field_offset ~= nil then
-                            DumperTable:Update(namespace, classname, "Fields", temp)
-                            if not PC then
-                                gg.toast("Plz Wait...", true)
-                            else
-                                print(field_dtype, Mode, field_name, field_offset)
-                            end
+                        DumperTable:Update(Namespace, Classname, "Fields", FieldData)
+
+                        -- Feedback for the user depending on the platform --
+                        if not IsPc then
+                            gg.toast("Please wait...", true)
+                        else
+                            print(FieldType, Mode, FieldName, FieldOffset)
                         end
                     end
                 end
             end
-            for meth in body:gmatch("// Methods(.+)") do
-                for offset, _, data_type, method_name in meth:gmatch("RVA:.-Offset: (0x%x+).-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%.*%a+) (.-) %{ %}\n") do
-                    if data_type == "int" or data_type == "bool" or data_type == "double" or data_type == "float" then
-                        if offset ~= nil and _ ~= nil and data_type ~= nil and method_name ~= nil then
-                            local temp = {
-                                name = tostring(method_name:gsub("%(.-%)", "")),
-                                type = tostring(data_type),
-                                Offset = offset,
-                                Info = _
-                            }
-                            DumperTable:Update(namespace, classname, "Methods", temp)
-                            if PC == true then
-                                print(data_type, method_name)
-                            end
+
+            -- Extract and store methods --
+            for MethodBody in Body:gmatch("// Methods(.+)") do
+                for Offset, Info, DataType, MethodName in MethodBody:gmatch("RVA:.-Offset: (0x%x+).-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%.*%a+) (.-) { %}\n") do
+                    if DataType == "int" or DataType == "bool" or DataType == "double" or DataType == "float" then
+                        local MethodData = {
+                            Name = MethodName:gsub("%(.-%)", ""),
+                            Type = DataType,
+                            Offset = Offset,
+                            Info = Info
+                        }
+                        DumperTable:Update(Namespace, Classname, "Methods", MethodData)
+
+                        if IsPc then
+                            print(DataType, MethodName)
                         end
                     end
                 end
             end
         end
     end
-    DumperTable.Update = nil
-    garbageClear(DumperTable)
+
+    CleanTable(DumperTable)
     return DumperTable
 end
 
-Dumper(str)
-DumperTable = FortifyGC(DumperTable)
+local DumperTable = Dumper(FileContent)
+DumperTable = OptimizeTable(DumperTable)
 
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-function Dump(ResTab)
-    local cache, stack, output = {}, {}, {}
-    local depth = 1
-    local output_str = "{\n"
+-- Converts table to strings --
+local function DumpTableToString(ResTab)
+    local Output, Stack, Cache = {}, {}, {}
+    local Depth = 1
+    local OutputStr = "{\n"
+    
     while true do
-        local size = 0
-        for k, v in pairs(ResTab) do
-            size = size + 1
+        local Size = 0
+        for _ in pairs(ResTab) do
+            Size = Size + 1
         end
-
-        local cur_index = 1
-        for k, v in pairs(ResTab) do
-            if (cache[ResTab] == nil) or (cur_index >= cache[ResTab]) then
-                if (string.find(output_str, "}", output_str:len())) then
-                    output_str = output_str .. ",\n"
-                elseif not (string.find(output_str, "\n", output_str:len())) then
-                    output_str = output_str .. "\n"
+        
+        local CurIndex = 1
+        for Key, Value in pairs(ResTab) do
+            if not Cache[ResTab] or CurIndex >= Cache[ResTab] then
+                if OutputStr:find("}", OutputStr:len()) then
+                    OutputStr = OutputStr .. ",\n"
+                elseif not OutputStr:find("\n", OutputStr:len()) then
+                    OutputStr = OutputStr .. "\n"
                 end
-                table.insert(output, output_str)
-                output_str = ""
+                table.insert(Output, OutputStr)
+                OutputStr = ""
 
-                
-                local key
-                if (type(k) == "number" or type(k) == "boolean") then
-                    key = "[" .. tostring(k) .. "]"
-                else
-                    key = "['" .. tostring(k) .. "']"
-                end
+                local KeyStr = (type(Key) == "number" or type(Key) == "boolean") and "[" .. tostring(Key) .. "]" or "['" .. tostring(Key) .. "']"
 
-                if (type(v) == "number" or type(v) == "boolean") then
-                    output_str = output_str .. string.rep("\t", depth) .. key .. " = " .. tostring(v)
-                elseif (type(v) == "table") then
-                    output_str = output_str .. string.rep("\t", depth) .. key .. " = {\n"
-                    table.insert(stack, ResTab)
-                    table.insert(stack, v)
-                    cache[ResTab] = cur_index + 1
+                if type(Value) == "number" or type(Value) == "boolean" then
+                    OutputStr = OutputStr .. string.rep("\t", Depth) .. KeyStr .. " = " .. tostring(Value)
+                elseif type(Value) == "table" then
+                    OutputStr = OutputStr .. string.rep("\t", Depth) .. KeyStr .. " = {\n"
+                    table.insert(Stack, ResTab)
+                    table.insert(Stack, Value)
+                    Cache[ResTab] = CurIndex + 1
                     break
                 else
-                    output_str = output_str .. string.rep("\t", depth) .. key .. " = '" .. tostring(v) .. "'"
+                    OutputStr = OutputStr .. string.rep("\t", Depth) .. KeyStr .. " = '" .. tostring(Value) .. "'"
                 end
 
-                if (cur_index == size) then
-                    output_str = output_str .. "\n" .. string.rep("\t", depth - 1) .. "}"
+                if CurIndex == Size then
+                    OutputStr = OutputStr .. "\n" .. string.rep("\t", Depth - 1) .. "}"
                 else
-                    output_str = output_str .. ","
+                    OutputStr = OutputStr .. ","
                 end
             else
-                if (cur_index == size) then
-                    output_str = output_str .. "\n" .. string.rep("\t", depth - 1) .. "}"
+                if CurIndex == Size then
+                    OutputStr = OutputStr .. "\n" .. string.rep("\t", Depth - 1) .. "}"
                 end
             end
 
-            cur_index = cur_index + 1
+            CurIndex = CurIndex + 1
         end
 
-        if (size == 0) then
-            output_str = output_str .. "\n" .. string.rep("\t", depth - 1) .. "}"
+        if Size == 0 then
+            OutputStr = OutputStr .. "\n" .. string.rep("\t", Depth - 1) .. "}"
         end
 
-        if (#stack > 0) then
-            ResTab = stack[#stack]
-            stack[#stack] = nil
-            depth = cache[ResTab] == nil and depth + 1 or depth - 1
+        if #Stack > 0 then
+            ResTab = Stack[#Stack]
+            Stack[#Stack] = nil
+            Depth = Cache[ResTab] and Depth - 1 or Depth + 1
         else
             break
         end
     end
 
-    table.insert(output, output_str)
-    output_str = table.concat(output)
-    return output_str
+    table.insert(Output, OutputStr)
+    return table.concat(Output)
 end
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-Res = io.output("DumpTable.lua")
+-- Output to a file --
+local Res = io.output("DumpTable.lua")
 Res:write(
-    "\n--[[\nNameSpace  ->>\n ClassName  ->>\n  (•)Fields \n\t ► Info \n\t ►  Name \n\t ►  Offset\n  (•)Methods \n\t ► Info \n\t ►  name \n\t ►  Type \n\t ►  Offset\n]]\n\n" ..
-        "Dumped_table = " .. Dump(DumperTable)
+    "\n--[[\nNamespace  ->>\n Classname  ->>\n  (•)Fields \n\t ► Info \n\t ►  Name \n\t ►  Offset\n  (•)Methods \n\t ► Info \n\t ►  Name \n\t ►  Type \n\t ►  Offset\n]]\n\n" ..
+    "DumpedTable = " .. DumpTableToString(DumperTable)
 )
 Res:close()
 File:close()
 
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-if not PC then
-    gg.alert("◄\tSuccess\t►\n\n\n File Name : DumpTable.lua\n\n Dir same as the script path!")
+if not IsPc then
+    gg.alert("◄\tSuccess\t►\n\n\n File Name: DumpTable.lua\n\n Dir same as the script path!")
 else
-    print("\n\n\n\n\n\n\tSuccess\t\n\n\n\n\n\n File Name : DumpTable.lua\n\n Dir same as the script path!")
+    print("\n\n\n\n\n\n\tSuccess\t\n\n\n\n\n\n File Name: DumpTable.lua\n\n Dir same as the script path!")
 end
