@@ -1,7 +1,7 @@
 local IsPc = not gg
 
 -- File Handling --
-local FilePath
+local FilePath, File
 
 if not IsPc then
     FilePath = gg.prompt(
@@ -11,17 +11,19 @@ if not IsPc then
     )
 
     if FilePath and FilePath[1] ~= gg.EXT_STORAGE .. "/Download/" then
-        File = assert(io.open(FilePath[1], "r"))
+        File = io.open(FilePath[1], "r")
+        assert(File, "Failed to open the file. Make sure the path is correct.")
     end
 else
     -- If on PC, default is dump.cs --
-    File = assert(io.open("dump.cs", "r"))
+    File = io.open("dump.cs", "r")
+    assert(File, "Failed to open dump.cs. Ensure the file exists in the working directory.")
 end
 
 local FileContent = File:read("*a")
+File:close() -- Ensure file is closed after reading
 
-
--- Function to Parse and clean the file --
+-- Function to Parse and Clean the file --
 local function Dumper(Content)
     local TrashPatterns = {}
 
@@ -40,25 +42,11 @@ local function Dumper(Content)
         return false
     end
 
-    -- Clean up the table --
+    -- Remove empty entries --
     local function CleanTable(Tab)
         for Key, Value in pairs(Tab) do
             if type(Value) == "table" then
                 CleanTable(Value)
-                if next(Value) == nil then
-                    Tab[Key] = nil
-                end
-            elseif not Value or Value == "" then
-                Tab[Key] = nil
-            end
-        end
-    end
-
-    -- Remove empty entries --
-    local function OptimizeTable(Tab)
-        for Key, Value in pairs(Tab) do
-            if type(Value) == "table" then
-                OptimizeTable(Value)
                 if next(Value) == nil then
                     Tab[Key] = nil
                 end
@@ -79,24 +67,22 @@ local function Dumper(Content)
         if Data then
             self[Name][Class][FieldMethod] = self[Name][Class][FieldMethod] or {}
             table.insert(self[Name][Class][FieldMethod], Data)
-            CleanTable(DumperTable)
         end
     end
 
     -- Parse to extract fields and methods --
-    for Namespace, Classname, Body in Content:gmatch("Namespace: (%g+)\n%.*public class (%a+) .-// TypeDefIndex:.-\n{(.-)\n}") do
+    for Namespace, Classname, Body in Content:gmatch("Namespace: (%g+)%s-\n%.*public class (%a+).-// TypeDefIndex:.-\n{(.-)\n}") do
         Namespace = Namespace or "System"
+        Namespace = Namespace:gsub("%.", "")
 
         if not IsTrash(Namespace) then
-            Namespace = Namespace:gsub("%.", "")
-
             -- Skip any body with public const string patterns --
             if Body:find("public const string %a+ =%g+") then
                 Body = ""
             end
 
             -- Extract and store fields --
-            for FieldBody in Body:gmatch("// Fields\n(.-)%// [%bMethods*%bProperties*]+.\n") do
+            for FieldBody in Body:gmatch("// Fields\n(.-)// [%bMethods*%bProperties*]+.\n") do
                 for FieldType, Mode, FieldName, FieldOffset in FieldBody:gmatch(".-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%a+) (%g+); // (0x%x+)") do
                     if FieldOffset ~= "0x0" and (Mode == "int" or Mode == "bool" or Mode == "double" or Mode == "float") then
                         local FieldData = {
@@ -106,7 +92,7 @@ local function Dumper(Content)
                             Info = FieldType
                         }
                         DumperTable:Update(Namespace, Classname, "Fields", FieldData)
-                        
+
                         if not IsPc then
                             gg.toast("Please wait...", true)
                         else
@@ -117,7 +103,7 @@ local function Dumper(Content)
             end
 
             -- Extract and store methods --
-            for MethodBody in Body:gmatch("// Methods(.+)") do
+            for MethodBody in Body:gmatch("// Methods(.-)// %a+") do
                 for Offset, Info, DataType, MethodName in MethodBody:gmatch("RVA:.-Offset: (0x%x+).-([public+*private+*protected+*internal+]+%s*[*override+*static+*readonly+*]*) (%.*%a+) (.-) { %}\n") do
                     if DataType == "int" or DataType == "bool" or DataType == "double" or DataType == "float" then
                         local MethodData = {
@@ -137,25 +123,23 @@ local function Dumper(Content)
         end
     end
 
-    CleanTable(DumperTable)
-    return DumperTable
+    return CleanTable(DumperTable)
 end
 
 local DumperTable = Dumper(FileContent)
-DumperTable = OptimizeTable(DumperTable)
 
 -- Converts table to strings --
 local function DumpTableToString(ResTab)
     local Output, Stack, Cache = {}, {}, {}
     local Depth = 1
     local OutputStr = "{\n"
-    
+
     while true do
         local Size = 0
         for _ in pairs(ResTab) do
             Size = Size + 1
         end
-        
+
         local CurIndex = 1
         for Key, Value in pairs(ResTab) do
             if not Cache[ResTab] or CurIndex >= Cache[ResTab] then
@@ -219,7 +203,6 @@ Res:write(
     "DumpedTable = " .. DumpTableToString(DumperTable)
 )
 Res:close()
-File:close()
 
 if not IsPc then
     gg.alert("◄\tSuccess\t►\n\n\n File Name: DumpTable.lua\n\n Dir same as the script path!")
